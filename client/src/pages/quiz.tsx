@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -14,11 +14,14 @@ type Question = {
   correct: Record<string, boolean>;
 };
 
+type AnswerKey = "A" | "B" | "C" | "D";
+
 const QuizApp = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [newQuestion, setNewQuestion] = useState("");
-  const [newAnswers, setNewAnswers] = useState({ A: "", B: "", C: "", D: "" });
-  const [correctAnswers, setCorrectAnswers] = useState({ A: false, B: false, C: false, D: false });
+  const [newAnswers, setNewAnswers] = useState<Record<AnswerKey, string>>({ A: "", B: "", C: "", D: "" });
+  const [correctAnswers, setCorrectAnswers] = useState<Record<AnswerKey, boolean>>({ A: false, B: false, C: false, D: false });
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizSize, setQuizSize] = useState(5);
   const [userAnswers, setUserAnswers] = useState<Array<{ index: number; isCorrect: boolean }>>([]);
@@ -34,29 +37,45 @@ const QuizApp = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(questionData),
+        credentials: 'include'
       });
-      if (!response.ok) throw new Error('Failed to add question');
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData);
+      }
+
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/questions'] });
-      toast({ title: "Question added successfully" });
+      toast({ title: "Pytanie zostało dodane pomyślnie" });
       setNewQuestion("");
       setNewAnswers({ A: "", B: "", C: "", D: "" });
       setCorrectAnswers({ A: false, B: false, C: false, D: false });
     },
-    onError: () => {
-      toast({ title: "Failed to add question", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ 
+        title: "Nie udało się dodać pytania", 
+        description: error.message,
+        variant: "destructive" 
+      });
     },
   });
 
   const addQuestion = () => {
-    const validAnswers = Object.entries(newAnswers).filter(([key, value]) => value.trim() !== "");
+    const validAnswers = Object.entries(newAnswers).filter(([_, value]) => value.trim() !== "");
     if (newQuestion.trim() && validAnswers.length > 0 && Object.values(correctAnswers).some((v) => v)) {
       addQuestionMutation.mutate({
         question: newQuestion,
         answers: newAnswers,
         correct: correctAnswers,
+      });
+    } else {
+      toast({
+        title: "Nieprawidłowe dane",
+        description: "Upewnij się, że wypełniłeś pytanie, przynajmniej jedną odpowiedź i zaznaczyłeś poprawną odpowiedź.",
+        variant: "destructive"
       });
     }
   };
@@ -97,17 +116,17 @@ const QuizApp = () => {
         <div>
           <Card className="mb-8">
             <CardContent className="pt-6">
-              <h2 className="text-xl font-semibold mb-4">Add a Question</h2>
+              <h2 className="text-xl font-semibold mb-4">Dodaj nowe pytanie</h2>
               <Input
-                placeholder="Enter your question"
+                placeholder="Wpisz pytanie"
                 value={newQuestion}
                 onChange={(e) => setNewQuestion(e.target.value)}
                 className="mb-4"
               />
-              {["A", "B", "C", "D"].map((option) => (
+              {(["A", "B", "C", "D"] as const).map((option) => (
                 <div key={option} className="mb-4 flex items-center gap-4">
                   <Input
-                    placeholder={`Answer ${option}`}
+                    placeholder={`Odpowiedź ${option}`}
                     value={newAnswers[option]}
                     onChange={(e) => setNewAnswers({ ...newAnswers, [option]: e.target.value })}
                     className="flex-1"
@@ -117,7 +136,7 @@ const QuizApp = () => {
                       checked={correctAnswers[option]}
                       onCheckedChange={(checked) => setCorrectAnswers({ ...correctAnswers, [option]: !!checked })}
                     />
-                    <label>Correct</label>
+                    <label>Poprawna</label>
                   </div>
                 </div>
               ))}
@@ -129,14 +148,14 @@ const QuizApp = () => {
                 {addQuestionMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
-                Add Question
+                Dodaj pytanie
               </Button>
             </CardContent>
           </Card>
 
           <Card className="mb-8">
             <CardContent className="pt-6">
-              <h2 className="text-xl font-semibold mb-4">Available Questions ({questions.length})</h2>
+              <h2 className="text-xl font-semibold mb-4">Dostępne pytania ({questions.length})</h2>
               <ul className="space-y-2">
                 {questions.map((q, i) => (
                   <li key={i} className="p-2 bg-secondary rounded-md">{q.question}</li>
@@ -147,9 +166,9 @@ const QuizApp = () => {
 
           <Card>
             <CardContent className="pt-6">
-              <h2 className="text-xl font-semibold mb-4">Start Quiz</h2>
+              <h2 className="text-xl font-semibold mb-4">Rozpocznij Quiz</h2>
               <div className="mb-4">
-                <label className="block mb-2">Number of questions:</label>
+                <label className="block mb-2">Liczba pytań:</label>
                 <Input
                   type="number"
                   value={quizSize}
@@ -163,7 +182,7 @@ const QuizApp = () => {
                 disabled={questions.length === 0}
                 className="w-full"
               >
-                Start Quiz
+                Rozpocznij Quiz
               </Button>
             </CardContent>
           </Card>
@@ -181,9 +200,9 @@ const QuizApp = () => {
                       : "text-red-600 font-medium"
                   }>
                     {userAnswers.find((a) => a.index === i)?.isCorrect
-                      ? "Correct!"
-                      : `Incorrect! The correct answers are: ${Object.entries(q.correct)
-                          .filter(([key, value]) => value)
+                      ? "Poprawna odpowiedź!"
+                      : `Niepoprawna odpowiedź! Poprawne odpowiedzi to: ${Object.entries(q.correct)
+                          .filter(([_, value]) => value)
                           .map(([key]) => key)
                           .join(", ")}`}
                   </p>
@@ -208,13 +227,13 @@ const QuizApp = () => {
           {userAnswers.length === quizQuestions.length && (
             <Card>
               <CardContent className="pt-6 text-center">
-                <h2 className="text-xl font-bold mb-2">Quiz Completed!</h2>
+                <h2 className="text-xl font-bold mb-2">Quiz zakończony!</h2>
                 <p className="mb-4">
-                  You got {correctAnswersCount} out of {quizQuestions.length} correct (
+                  Zdobyłeś {correctAnswersCount} z {quizQuestions.length} punktów (
                   {((correctAnswersCount / quizQuestions.length) * 100).toFixed(2)}%)
                 </p>
                 <Button onClick={restartQuiz} className="w-full">
-                  Start New Quiz
+                  Rozpocznij nowy Quiz
                 </Button>
               </CardContent>
             </Card>
