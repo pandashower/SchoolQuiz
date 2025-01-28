@@ -4,7 +4,7 @@
   ],
   "headers": [
     {
-      "source": "/assets/*.js",
+      "source": "/attached_assets/*.js",
       "headers": [
         {
           "key": "Content-Type",
