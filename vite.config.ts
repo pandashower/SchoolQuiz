@@ -1,9 +1,10 @@
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
-import path from "path";
+import path, { dirname } from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 export default defineConfig({
   plugins: [react(), runtimeErrorOverlay(), themePlugin()],
   resolve: {
@@ -12,10 +13,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "client", "src"),
     },
   },
-  root: "client", // To powinno wskazywać na katalog, gdzie jest `index.html`
+  root: path.resolve(__dirname, "client"),
   build: {
-    outDir: "dist", // Zmiana na domyślny folder `dist/`
+    outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
-  base: "./", // Zapewnia poprawne ładowanie zasobów w Vercel
 });
