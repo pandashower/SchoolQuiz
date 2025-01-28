@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 type Question = {
   id: number;
@@ -100,6 +100,39 @@ const QuizApp = () => {
 
   const correctAnswersCount = userAnswers.filter((a) => a.isCorrect).length;
 
+  const deleteQuestionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/questions/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/questions'] });
+      toast({ title: "Pytanie zostało usunięte" });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Nie udało się usunąć pytania", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleDeleteQuestion = (id: number) => {
+    if (window.confirm('Czy na pewno chcesz usunąć to pytanie?')) {
+      deleteQuestionMutation.mutate(id);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -157,8 +190,23 @@ const QuizApp = () => {
             <CardContent className="pt-6">
               <h2 className="text-xl font-semibold mb-4">Dostępne pytania ({questions.length})</h2>
               <ul className="space-y-2">
-                {questions.map((q, i) => (
-                  <li key={i} className="p-2 bg-secondary rounded-md">{q.question}</li>
+                {questions.map((q) => (
+                  <li key={q.id} className="p-2 bg-secondary rounded-md flex justify-between items-center">
+                    <span>{q.question}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteQuestion(q.id)}
+                      className="h-8 w-8"
+                      disabled={deleteQuestionMutation.isPending}
+                    >
+                      {deleteQuestionMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </li>
                 ))}
               </ul>
             </CardContent>

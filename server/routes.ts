@@ -19,7 +19,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/questions", async (req, res) => {
     try {
       const { question, answers, correct } = req.body;
-      
+
       if (!question || !answers || !correct) {
         return res.status(400).json({ error: "Missing required fields" });
       }
@@ -33,6 +33,21 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(newQuestion);
     } catch (error) {
       res.status(500).json({ error: "Failed to add question" });
+    }
+  });
+
+  // Delete a question
+  app.delete("/api/questions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid question ID" });
+      }
+
+      await db.delete(questions).where(eq(questions.id, id));
+      res.status(200).json({ message: "Question deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete question" });
     }
   });
 
